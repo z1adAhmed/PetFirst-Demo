@@ -11,7 +11,7 @@ jobs:
 
     env:
       AWS_REGION: ap-south-1
-      ECR_REPOSITORY: petsfirst--ecr-prod
+      ECR_REPOSITORY: petsfirst--ecr-staging
 
     steps:
       - name: Checkout repository
