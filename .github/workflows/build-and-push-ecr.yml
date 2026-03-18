@@ -31,14 +31,21 @@ jobs:
       - name: Set image tag
         run: echo "IMAGE_TAG=${GITHUB_SHA::8}" >> $GITHUB_ENV
 
-      - name: Build Docker image
-        run: |
-          docker build -t $ECR_REPOSITORY:$IMAGE_TAG ./portfolio-app
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3  # enables arm64 emulation
 
-      - name: Push Docker image to ECR
-        run: |
-          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3  # enables multi-arch builds
+
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./portfolio-app
+          platforms: linux/arm64  # target your EC2 arm64 instances
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
 
       - name: Output pushed image URI
         run: |
