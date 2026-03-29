@@ -122,4 +122,4 @@ jobs:
         run: |
           docker push $ECR_REGISTRY/$ECR_REPOSITORY --all-tags
           echo "✅ Pushed $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          echo "✅ Pushed $ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          echo "✅ Pushed $ECR_REGISTRY/$ECR_REPOSITORY:latest "
