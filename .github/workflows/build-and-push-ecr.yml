@@ -111,17 +111,19 @@ jobs:
             fi
           fi
 
-      - name: Build and push image for AMD64
+      # ✅ FIXED HERE: build for ARM64 instead of AMD64
+      - name: Build and push image for ARM64
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ needs.versioning.outputs.new_version }}
         run: |
           docker buildx build \
-            --platform linux/amd64 \
+            --platform linux/arm64 \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             -f petsfirst-broadcast-hub-main/Dockerfile \
             petsfirst-broadcast-hub-main/ \
             --push
-          echo "✅ Pushed $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          echo "✅ Pushed $ECR_REGISTRY/$ECR_REPOSITORY:latest"
+
+          echo "✅ Pushed $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG (ARM64)"
+          echo "✅ Pushed $ECR_REGISTRY/$ECR_REPOSITORY:latest (ARM64)"
