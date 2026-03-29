@@ -1,0 +1,74 @@
+/* Theme overrides for react-phone-input-2 to match #00A89E */
+
+.react-tel-input .form-control {
+  border-color: #cbd5e1;
+  border-radius: 0.5rem;
+  height: 40px;
+  padding-left: 48px;
+  font-size: 0.875rem;
+  width: 100%;
+}
+
+.react-tel-input .form-control:focus {
+  border-color: #00A89E;
+  box-shadow: 0 0 0 2px rgba(0, 168, 158, 0.25);
+  outline: none;
+}
+
+.react-tel-input .flag-dropdown {
+  border-color: #cbd5e1;
+  border-radius: 0.5rem 0 0 0.5rem;
+  background-color: #f8fafc;
+}
+
+.react-tel-input .flag-dropdown:hover,
+.react-tel-input .flag-dropdown:focus {
+  background-color: #f1f5f9;
+}
+
+.react-tel-input .flag-dropdown.open {
+  border-color: #00A89E;
+  background: #fff;
+}
+
+.react-tel-input .flag-dropdown.open .selected-flag {
+  background: #fff;
+}
+
+.react-tel-input .selected-flag:hover,
+.react-tel-input .selected-flag:focus {
+  background-color: #f8fafc;
+}
+
+.react-tel-input .selected-flag .arrow {
+  border-top-color: #64748b;
+}
+
+.react-tel-input .selected-flag .arrow.up {
+  border-bottom-color: #64748b;
+}
+
+.react-tel-input .country-list {
+  border-radius: 0 0 0.5rem 0.5rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.react-tel-input .country-list .country:hover,
+.react-tel-input .country-list .country.highlight {
+  background-color: rgba(0, 168, 158, 0.1);
+}
+
+.react-tel-input .country-list .country .dial-code {
+  color: #64748b;
+}
+
+.react-tel-input .country-list .search-box {
+  border-color: #e2e8f0;
+}
+
+.react-tel-input .country-list .search-box:focus {
+  border-color: #00A89E;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 168, 158, 0.2);
+}

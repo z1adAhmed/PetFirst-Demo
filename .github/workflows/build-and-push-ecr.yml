@@ -1,24 +1,66 @@
-name: Build and Push Docker to ECR
+name: Build & Push to ECR (Staging)
 
 on:
   push:
     branches:
       - main
 
-jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
+env:
+  AWS_REGION: eu-central-1
+  ECR_REPOSITORY: petsfirst-ecr-broadcast-staging
 
-    env:
-      AWS_REGION: ap-south-1
-      ECR_REPOSITORY: petsfirst--ecr-staging
+jobs:
+  versioning:
+    name: Generate Version
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.bump_version.outputs.new_version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          LATEST_TAG=$(git tag -l "v*.*.*" | sort -V | tail -n 1)
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="v1.0.0"
+          fi
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "Latest tag: $LATEST_TAG"
+
+      - name: Bump minor version
+        id: bump_version
+        run: |
+          LATEST="${{ steps.get_tag.outputs.latest_tag }}"
+          VERSION="${LATEST#v}"
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f2)
+          NEW_MINOR=$((MINOR + 1))
+          NEW_VERSION="v${MAJOR}.${NEW_MINOR}.0"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+
+      - name: Create and push new tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.bump_version.outputs.new_version }}
+          git push origin ${{ steps.bump_version.outputs.new_version }}
+
+  build-and-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: versioning
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -28,26 +70,56 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Set image tag
-        run: echo "IMAGE_TAG=${GITHUB_SHA::8}" >> $GITHUB_ENV
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3  # enables arm64 emulation
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3  # enables multi-arch builds
-
-      - name: Build and Push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./portfolio-app
-          platforms: linux/arm64  # target your EC2 arm64 instances
-          push: true
-          tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
-
-      - name: Output pushed image URI
+      - name: Find and untag previous latest image
         run: |
-          echo "Docker image pushed:"
-          echo "${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo "Looking for the second most recent image in ECR..."
+
+          PREV_IMAGE_DIGEST=$(aws ecr describe-images \
+            --repository-name $ECR_REPOSITORY \
+            --region $AWS_REGION \
+            --query "sort_by(imageDetails, &imagePushedAt)[-2].imageDigest" \
+            --output text 2>/dev/null)
+
+          if [ -z "$PREV_IMAGE_DIGEST" ] || [ "$PREV_IMAGE_DIGEST" == "None" ]; then
+            echo "No previous image found, skipping untag step."
+          else
+            echo "Previous image digest: $PREV_IMAGE_DIGEST"
+
+            HAS_LATEST=$(aws ecr describe-images \
+              --repository-name $ECR_REPOSITORY \
+              --region $AWS_REGION \
+              --image-ids imageDigest=$PREV_IMAGE_DIGEST \
+              --query "imageDetails[0].imageTags" \
+              --output text | grep -w "latest" || true)
+
+            if [ -n "$HAS_LATEST" ]; then
+              echo "Removing 'latest' tag from previous image..."
+              aws ecr batch-delete-image \
+                --repository-name $ECR_REPOSITORY \
+                --region $AWS_REGION \
+                --image-ids imageTag=latest
+              echo "✅ 'latest' tag removed from previous image."
+            else
+              echo "Previous image does not have 'latest' tag, skipping."
+            fi
+          fi
+
+      - name: Build image with both version and latest tags
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ needs.versioning.outputs.new_version }}
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            -f petsfirst-broadcast-hub-main/Dockerfile \
+            petsfirst-broadcast-hub-main/
+
+      - name: Push both tags to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ needs.versioning.outputs.new_version }}
+        run: |
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY --all-tags
+          echo "✅ Pushed $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo "✅ Pushed $ECR_REGISTRY/$ECR_REPOSITORY:latest"

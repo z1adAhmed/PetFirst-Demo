@@ -1,0 +1,5 @@
+{
+  "name": "PetsFirst Broadcast Hub",
+  "description": "A professional tool for pet clinics to broadcast personalized WhatsApp messages to pet owners using the Meta Business API, featuring CSV parsing and template management.",
+  "requestFramePermissions": []
+}
