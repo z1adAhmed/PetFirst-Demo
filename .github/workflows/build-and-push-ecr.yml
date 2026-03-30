@@ -36,40 +36,6 @@ jobs:
         id: short_sha
         run: echo "sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
-      - name: Find and untag previous latest image
-        run: |
-          echo "Looking for the second most recent image in ECR..."
-
-          PREV_IMAGE_DIGEST=$(aws ecr describe-images \
-            --repository-name $ECR_REPOSITORY \
-            --region $AWS_REGION \
-            --query "sort_by(imageDetails, &imagePushedAt)[-2].imageDigest" \
-            --output text 2>/dev/null)
-
-          if [ -z "$PREV_IMAGE_DIGEST" ] || [ "$PREV_IMAGE_DIGEST" == "None" ]; then
-            echo "No previous image found, skipping untag step."
-          else
-            echo "Previous image digest: $PREV_IMAGE_DIGEST"
-
-            HAS_LATEST=$(aws ecr describe-images \
-              --repository-name $ECR_REPOSITORY \
-              --region $AWS_REGION \
-              --image-ids imageDigest=$PREV_IMAGE_DIGEST \
-              --query "imageDetails[0].imageTags" \
-              --output text | grep -w "latest" || true)
-
-            if [ -n "$HAS_LATEST" ]; then
-              echo "Removing 'latest' tag from previous image..."
-              aws ecr batch-delete-image \
-                --repository-name $ECR_REPOSITORY \
-                --region $AWS_REGION \
-                --image-ids imageTag=latest
-              echo "✅ 'latest' tag removed from previous image."
-            else
-              echo "Previous image does not have 'latest' tag, skipping."
-            fi
-          fi
-
       - name: Build and push image for ARM64
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -79,10 +45,8 @@ jobs:
             --platform linux/arm64 \
             --provenance=false \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             -f petsfirst-broadcast-hub-main/Dockerfile \
             petsfirst-broadcast-hub-main/ \
             --push
 
           echo "✅ Pushed $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG (ARM64)"
-          echo "✅ Pushed $ECR_REGISTRY/$ECR_REPOSITORY:latest (ARM64)"
