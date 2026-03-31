@@ -1,4 +1,4 @@
-name: Build & Push to ECR (Staging)
+name: Build & Push to ECR
 
 on:
   push:
@@ -8,6 +8,10 @@ on:
 env:
   AWS_REGION: eu-central-1
   ECR_REPOSITORY: petsfirst-ecr-broadcast-staging
+  ECS_CLUSTER: petsfirst-ecs-cls-stg
+  ECS_SERVICE: app-service
+  CONTAINER_NAME: app
+  TASK_DEFINITION: app
 
 jobs:
   build-and-push:
@@ -37,6 +41,7 @@ jobs:
         run: echo "sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
       - name: Build and push image for ARM64
+        id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ steps.short_sha.outputs.sha }}
@@ -50,3 +55,27 @@ jobs:
             --push
 
           echo "✅ Pushed $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG (ARM64)"
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.TASK_DEFINITION }} \
+            --query taskDefinition \
+            > task-definition.json
+
+      - name: Render new task definition with updated image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
