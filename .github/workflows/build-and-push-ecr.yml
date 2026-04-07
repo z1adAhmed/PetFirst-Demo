@@ -9,7 +9,7 @@ env:
   AWS_REGION: eu-central-1
   ECR_REPOSITORY: petsfirst-ecr-broadcast-staging
   ECS_CLUSTER: petsfirst-ecs-cls-stg
-  ECS_SERVICE: app-service
+  ECS_SERVICE: app-service1
   CONTAINER_NAME: app
   TASK_DEFINITION: app
 
